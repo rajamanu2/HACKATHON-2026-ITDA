@@ -8,6 +8,15 @@ Scope: local development build, synthetic data and isolated temporary databases.
 | `node tests/care-browser.mjs` | Passed actual local model inference using generated noise; model availability; doctor acknowledgement; shared result persistence; care entry; Telugu screen; mobile width |
 | Model integrity and architecture | Pinned SHA-256 matched; `weights_only=True`; strict MobileNetV2 two-class load passed |
 | Android `assembleDebug lintDebug` | Passed. Debug distribution; known lint/deprecation warnings remain documented in build reports |
+| Shared browser regression | Passed English/Telugu login, offline photo/reload, isolated worker/doctor sessions, shared review visibility, stale draft protection, mobile layout and logout |
+| Native bridge regression | Passed simulated Android protocol, cookie isolation, offline cached identity and queued capture/upload; not a handset test |
+| `node tests/care-n8n.mjs` | Passed actual local diagnostic event acknowledgement, worker visibility and zero pending events after n8n startup completed |
+| `node tests/video-roundtrip.mjs` | Passed n8n-confirmed room preparation and worker link access; actual call not tested |
+| Anonymous public assets | HTTPS page and health passed; anonymous patient access denied; downloaded APK matches local SHA-256 |
+
+Rebuilt APK: `dist/android/Aarogya-Drishti-0.3.0-debug.apk`. SHA-256: `8915379d29d08bb6b731723f89f3b612cd706c010c1f4cf3840eed6bc6467635`.
+
+After a cold n8n restart, `/healthz` became ready before workflow/JS-runner startup completed. The first care-event check timed out; queued events subsequently delivered and the fresh care/video checks above passed. Service health alone is not workflow readiness. n8n's optional Python task runner is unavailable; these workflows use the JavaScript runner, and research inference uses its separate project Python environment.
 
 Earlier local verification covered English/Telugu worker/doctor workflows, offline photo storage, queued sync, stale review drafts, Saathi auto-fill/recovery, the native transport contract, n8n receipts and consultation callbacks. Those results do not establish physical handset camera/voice acceptance, video connection or clinical accuracy.
 
