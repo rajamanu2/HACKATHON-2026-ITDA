@@ -1,6 +1,10 @@
 # Permanent website and Android hosting
 
-Prepared deployment package; **not deployed**. No cloud account, paid server, domain, DNS record, cloud database or replacement APK has been created by this package. The current live app still depends on the local PC. Docker is unavailable on this authoring machine, so the container build/runtime is not yet verified.
+Prepared deployment package; **not deployed**. The selected route is a free VM retaining n8n and Python; paid Railway hosting is not authorized. No cloud account, paid server, domain, DNS record, cloud database or replacement APK has been created by this package. The current app still depends on the local PC. The first x86 GitHub container check passed build, startup, model architecture, authentication boundary and persistent-identity restart checks. ARM and the subsequent startup updates need their separate check before deployment.
+
+## Selected route: Oracle Always Free VM
+
+See [the free-VM setup checklist](cloud/ORACLE-FREE.md). Account sign-in/identity verification and actual free capacity are required. There is no connected Oracle account or VM yet. Do not use a paid shape, upgrade to Pay As You Go, or rely on expiring trial credits. No availability or always-on guarantee is made by this repository.
 
 ## What runs remotely
 
@@ -14,7 +18,7 @@ Use one app instance with SQLite. Horizontal replicas need a database migration 
 
 1. Sign in to your own Railway account and connect `rajamanu2/HACKATHON-2026-ITDA`. No account password or API token should be pasted into chat.
 2. Deploy the root Dockerfile. `railway.json` sets the startup and health endpoint. Before starting, attach a persistent volume at `/app/.local` and confirm sufficient memory.
-3. Set `DATA_DIR=/app/.local`, `COOKIE_SECURE=true`; retain the Python/n8n environment defaults in the Dockerfile. Generate the service's public HTTPS domain and expose only the app port (`PORT`, supplied by Railway). Do not expose n8n's 5678 as a public service.
+3. Set `DATA_DIR=/app/.local`, `COOKIE_SECURE=true`, and `RAILWAY_RUN_UID=0` for Railway's root-owned volume. The supervisor adjusts ownership of the verified data mount and immediately drops to UID/GID 1000 before starting either service. Retain the other Python/n8n defaults. Generate the service's public HTTPS domain and expose only the app port (`PORT`, supplied by Railway). Do not expose n8n's 5678 as a public service.
 4. Complete the private n8n setup and workflow import below through the provider's authenticated shell. Check an actual callback; health alone is not workflow readiness.
 5. Build the Android update for the returned permanent HTTPS origin, add its verified artifact to `cloud/releases/Aarogya-Drishti-cloud.apk`, and redeploy that artifact with the image. The placeholder folder contains no APK today. Confirm both website and APK work while the PC app/tunnels are stopped.
 
@@ -52,7 +56,7 @@ For Railway, use its authenticated service shell and a controlled maintenance wi
 
 The APK must contain the permanent origin, not `192.168.*`, an emulator address or `trycloudflare.com`. Once that origin is assigned, set ignored `.local/android-server.json` to `{"url":"https://actual-host.example"}` and build a higher-version same-signer update. Do not uninstall or clear app data. Changing server instances does not migrate existing pending captures automatically; inspect account-scoped queues before switching.
 
-Use the existing build helper, verify its certificate against the installed version, copy the resulting APK to `cloud/releases/Aarogya-Drishti-cloud.apk` for the deployment build, and verify SHA-256 against the public `/downloads/android` response. `ANDROID_APK_PATH` selects that fixed server-side file; visitors cannot choose filesystem paths. Do not label an old LAN APK a hosted release.
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-cloud-android.ps1 -ServerUrl https://actual-host.example` (SDK/Gradle parameters are supported). This builds version 0.3.2/code 5 by default, stages the cloud APK, and keeps the original signing setup. Verify its certificate against the installed version, copy the resulting APK to `cloud/releases/Aarogya-Drishti-cloud.apk` for the deployment build, and verify SHA-256 against the public `/downloads/android` response. `ANDROID_APK_PATH` selects that fixed server-side file; visitors cannot choose filesystem paths. Do not label an old LAN APK a hosted release.
 
 ## Required go-live evidence
 

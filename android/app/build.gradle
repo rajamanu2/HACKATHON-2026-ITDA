@@ -7,7 +7,7 @@ if (!(configuredServer ==~ /https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{
 android {
     namespace 'in.itda.drishti'
     compileSdk 35
-    defaultConfig { applicationId 'in.itda.drishti'; minSdk 26; targetSdk 35; versionCode 4; versionName '0.3.1'; buildConfigField 'String', 'DEFAULT_SERVER_URL', '"' + configuredServer + '"' }
+    defaultConfig { applicationId 'in.itda.drishti'; minSdk 26; targetSdk 35; versionCode = (project.findProperty('careVersionCode') ?: '4').toInteger(); versionName = (project.findProperty('careVersionName') ?: '0.3.1').toString(); buildConfigField 'String', 'DEFAULT_SERVER_URL', '"' + configuredServer + '"' }
     buildFeatures { buildConfig true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false; if(configuredServer.startsWith('http:')) buildConfigField 'String', 'DEFAULT_SERVER_URL', '""' } }

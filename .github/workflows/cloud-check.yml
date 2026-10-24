@@ -11,7 +11,11 @@ on:
       - .github/workflows/cloud-check.yml
 jobs:
   container:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -23,7 +27,7 @@ jobs:
       - run: npm test
       - run: docker build -t drishti-cloud-check .
       - name: Start isolated persistent-volume container
-        run: docker run -d --name care-check -p 127.0.0.1:54173:4173 --mount type=volume,source=care-check-data,target=/app/.local drishti-cloud-check
+        run: docker run -d --user 0 --name care-check -p 127.0.0.1:54173:4173 --mount type=volume,source=care-check-data,target=/app/.local drishti-cloud-check
       - name: Wait for app health and verify model architecture
         run: |
           for attempt in $(seq 1 120); do
@@ -33,6 +37,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:54173/api/health
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:54173/api/patients)" = 401
           docker exec care-check /opt/ai/bin/python scripts/research-ai.py --check
+          docker exec care-check node -e "const s=require('node:fs').readFileSync('/proc/1/status','utf8');if(!/^Uid:\s+1000\s+1000/m.test(s))throw Error('Supervisor did not drop root privileges');console.log('Application supervisor runs without root privileges.');"
       - name: Restart and verify persistent identity
         run: |
           docker restart care-check
