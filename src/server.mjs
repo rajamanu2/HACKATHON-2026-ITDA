@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {isIPv4} from 'node:net';
 import {readFile,realpath} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {randomBytes,timingSafeEqual,randomUUID,scrypt} from 'node:crypto';
@@ -18,6 +19,8 @@ function validatePatient(input){
 }
 function validateDate(value){if(!value)return '';if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T00:00:00Z'))||new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value)fail(400,'Invalid appointment date.');return value;}
 export async function startServer(options={}){
+ const lanHost=options.lanHost||process.env.LAN_HOST||'';
+ if(lanHost&&(!isIPv4(lanHost)||!/^(10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$/.test(lanHost)))throw Error('LAN_HOST must be an explicit private IPv4 address.');
  const infer=options.researchAI||runResearchAI;let aiBusy=false,aiStatusPromise=null,aiCheckedAt=0;
  const directory=options.dataDir||process.env.DATA_DIR||resolve('.local');const db=openStore(directory);const root=await realpath(resolve('public'));const secure=process.env.COOKIE_SECURE==='true';const attempts=new Map();let delivering=false;const dummyPasswordHash=passwordHash(randomBytes(32).toString('hex'));
  const setting=key=>db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value;const instanceId=db.prepare('SELECT value FROM meta WHERE key=?').get('instanceId').value;
@@ -35,7 +38,7 @@ export async function startServer(options={}){
    catch{db.prepare('UPDATE events SET attempts=attempts+1,last_error=? WHERE id=?').run('n8n delivery failed; will retry.',row.id);break;}
   }return {delivered,pending:db.prepare('SELECT count(*) AS n FROM events WHERE delivered_at IS NULL').get().n};}finally{delivering=false;}
  }
- const server=http.createServer(async(req,res)=>{
+ const handle=async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; script-src 'self'; frame-src https://meet.jit.si; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
   try{
    const path=new URL(req.url,'http://localhost').pathname,method=req.method;
@@ -94,9 +97,12 @@ export async function startServer(options={}){
     if(path==='/api/admin/audit'&&method==='GET'){allowed(s,['admin']);return json(res,200,{audit:db.prepare('SELECT a.*,u.name FROM audit a JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all()});}
     fail(404,'API route not found.');
    }
-   if(path==='/downloads/android'&&method==='GET'){try{const apk=await readFile(resolve('dist/android/Aarogya-Drishti-0.3.0-debug.apk'));res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="Aarogya-Drishti-0.3.0-debug.apk"','Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
+   if(path==='/downloads/android'&&method==='GET'){try{const apk=await readFile(resolve('dist/android/Aarogya-Drishti-0.3.1-debug.apk'));res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="Aarogya-Drishti-0.3.1-debug.apk"','Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
    if(!['GET','HEAD'].includes(method))fail(405,'Method not allowed.');const pathname=decodeURIComponent(path);const file=resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+sep))fail(403,'Access denied.');let actual;try{actual=await realpath(file);}catch{fail(404,'Not found.');}if(!actual.startsWith(root+sep))fail(403,'Access denied.');const data=await readFile(actual);res.writeHead(200,{'Content-Type':types[extname(actual)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(method==='HEAD'?undefined:data);
   }catch(e){if(!res.headersSent)json(res,e.status||500,{error:e.status?e.message:'The server could not complete the request.'});else res.end();}
- });
- const interval=setInterval(()=>{if(integration().url)deliver().catch(()=>{});},15000);interval.unref();server.on('close',()=>{clearInterval(interval);db.close();});await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port??Number(process.env.PORT||4173),options.host||process.env.HOST||'127.0.0.1',resolve);});return server;
+ };
+ const server=http.createServer(handle);let lanServer=null;
+ const interval=setInterval(()=>{if(integration().url)deliver().catch(()=>{});},15000);interval.unref();server.on('close',()=>{clearInterval(interval);if(lanServer?.listening)lanServer.close(()=>db.close());else db.close();});await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port??Number(process.env.PORT||4173),options.host||process.env.HOST||'127.0.0.1',resolve);});
+ if(lanHost){lanServer=http.createServer(handle);try{await new Promise((resolve,reject)=>{lanServer.once('error',reject);lanServer.listen(options.lanPort??Number(process.env.LAN_PORT||4174),lanHost,resolve);});server.lanAddress=lanServer.address();}catch(error){server.close();throw error;}}
+ return server;
 }

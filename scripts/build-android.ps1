@@ -12,5 +12,5 @@ Set-Content -LiteralPath 'android/local.properties' -Value $sdkProperty -Encodin
 & $GradleCommand -p android --no-daemon assembleDebug lintDebug
 if ($LASTEXITCODE -ne 0) { throw 'Android build failed.' }
 New-Item -ItemType Directory -Path 'dist/android' -Force | Out-Null
-Copy-Item -LiteralPath 'android/app/build/outputs/apk/debug/app-debug.apk' -Destination 'dist/android/Aarogya-Drishti-0.3.0-debug.apk' -Force
-Get-FileHash -LiteralPath 'dist/android/Aarogya-Drishti-0.3.0-debug.apk' -Algorithm SHA256 | Select-Object Hash,Path
+Copy-Item -LiteralPath 'android/app/build/outputs/apk/debug/app-debug.apk' -Destination 'dist/android/Aarogya-Drishti-0.3.1-debug.apk' -Force
+Get-FileHash -LiteralPath 'dist/android/Aarogya-Drishti-0.3.1-debug.apk' -Algorithm SHA256 | Select-Object Hash,Path

@@ -31,3 +31,13 @@ No local credentials or patient records were submitted through the public tunnel
 5. Verify host availability, a fresh tunnel address, private test-account handoff and the five-minute recording before submission.
 
 Use the exact research model revision and checksum in RESEARCH-AI.md. Generated-noise inference proves execution only: it cannot test diagnostic sensitivity, specificity, calibration, anatomy recognition or safety for patient decisions.
+
+
+## Android 0.3.1 connection repair
+
+- Actual Java transport tests passed: UTF-8 POST, HTTP 401 preserved as authentication failure, cookie/CSRF headers, PATCH alias, gzip decode, HTML and redirect rejection, URL normalization and error classification. No actual account credentials were sent through a public tunnel.
+- Anonymous public health passed via the same Java class on the desktop JVM; this is not Android handset proof.
+- Extended native-bridge browser test passed saved-address/version display, successful and failed anonymous connection tests, offline session recovery and queued upload.
+- Seven API/domain tests passed after the shared handler/LAN addition. `node tests/lan-check.mjs` passed private-only bind validation, common instance/database, anonymous access denial and a synthetic shared record across Wi-Fi and loopback.
+- Android assembleDebug/lintDebug passed. Version 0.3.1, code 4, same signer as 0.3.0. Wi-Fi download SHA-256: `4a57785d220d9fa46d76ff9de5f2b76f74105632cdd9927e95ae35e5e039cf16`.
+- PC-side health and exact APK download passed at `http://192.168.1.3:4174`. Windows accepted the subnet-scoped app firewall rule. Physical-phone health and login acceptance remain pending user confirmation.

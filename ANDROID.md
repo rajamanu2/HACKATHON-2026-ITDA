@@ -1,4 +1,4 @@
-# Android app - Aarogya Drishti 0.3.0
+# Android app - Aarogya Drishti 0.3.1
 
 The Android app packages the glass interface and offline intake workflow inside an Android application, with native camera/gallery capture, native speech intent, haptic feedback, a server connection dialog and an in-app video consultation activity. It is a hybrid application, not a Jetpack Compose implementation or a shortcut that only opens a hosted website.
 
@@ -10,7 +10,7 @@ npm run build:android
 
 Requires JDK 17 or newer, Android SDK platform 35/build tools and Gradle compatible with Android Gradle Plugin 8.9.2. The helper can use an installed Gradle 8.14.3 distribution. For other paths, use the script's `SdkDirectory` and `GradleCommand` parameters. Android Studio can also open the `android` project.
 
-Output: `dist/android/Aarogya-Drishti-0.3.0-debug.apk`. This is a debug-signed demonstration build, not a Play Store release. The signature is handled by the standard Android debug build; no release signing key is included in the project. Generated assets, local SDK paths, build directories and APKs are excluded from Git.
+Output: `dist/android/Aarogya-Drishti-0.3.1-debug.apk`. This is a debug-signed demonstration build, not a Play Store release. The signature is handled by the standard Android debug build; no release signing key is included in the project. Generated assets, local SDK paths, build directories and APKs are excluded from Git.
 
 The web login page includes a **Download Android app** link when the local server has a built package. The APK contains UI files only. It does not contain patient records, passwords, n8n credentials or Cloudflare certificates.
 
@@ -41,3 +41,18 @@ Android opens the room in a separate in-app activity. That activity has no patie
 Verified: Android debug compilation, compatibility lint and package signature, browser UI, offline Telugu chat-to-form flow, explicit consent, shared worker/doctor records, rejected stale reviews, role-protected bulk provisioning and a real local n8n consultation callback.
 
 Not verified on a real handset: camera capture, recognition provider, microphone/video permissions, in-app media connection or two-person call quality. No test application was installed on an unrelated phone or existing emulator. A temporary HTTPS link and anonymous APK download were verified. Account-backed custom-domain activation still needs the actual domain and account authorization. Public credential-based login verification was blocked by automatic approval review; local worker/doctor authentication passed.
+
+
+## 0.3.1 connection repair
+
+The phone could open ordinary websites but could not reach either Cloudflare test address or the alternate public tunnel. This establishes a phone-network reachability issue, not a confirmed DNS or TLS diagnosis. The local development fallback binds an additional server only to the PC Wi-Fi address `192.168.1.3:4174`, sharing the same handler/database as loopback. Start it with `powershell -NoProfile -File scripts/start-wifi.ps1`. The default app still binds loopback unless LAN_HOST is explicitly set. A changed PC Wi-Fi IP requires updating the configuration and firewall rule.
+
+For this same-Wi-Fi debug build, ignored `.local/android-server.json` selects `http://192.168.1.3:4174`. Release builds never embed an HTTP default. The phone must remain on the same Wi-Fi; this is a development connection for synthetic/authorized demonstration data, not permanent remote hosting. Do not switch to mobile data for this address. The app's original account-scoped records and credentials are preserved.
+
+The firewall helper requires Windows administrator approval and allows only Node TCP 4174 at local IP 192.168.1.3 from subnet 192.168.1.0/24. It does not expose n8n or modify the Wi-Fi network profile. Receipt: private `.local/lan-firewall-result.json`. Rule name: `Drishti-Local-WiFi-4174`.
+
+The upgrade prompts for Test & connect if the saved server differs from the suggested Wi-Fi address. It tests `/api/health` and a compatible instance ID before saving. A failed test preserves the previous address/session; changing servers explicitly clears only the native login and identity metadata, never patient records. Reusing the same address preserves the session. Download URLs and health URLs pasted into the dialog are normalized to their base address.
+
+Native transport now explicitly requests JSON, handles compressed responses, rejects redirects/HTML without following credentials to another host, disconnects in all cases, and distinguishes DNS, TLS and timeout failures. The JavaScript bridge deadline exceeds native request timeouts. Login displays the actual saved address, APK version and a credential-free Test connection button. TLS verification remains enabled.
+
+Verified: Java HTTP transport tests, native-bridge browser/offline regression, seven API/domain tests, private-IP LAN shared-database test, APK compile/lint, identical signing certificate to 0.3.0 and exact LAN download hash. The phone's final health/login acceptance must be confirmed separately.
