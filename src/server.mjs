@@ -1,0 +1,73 @@
+import http from 'node:http';
+import {readFile,realpath} from 'node:fs/promises';
+import {resolve,extname,sep} from 'node:path';
+import {randomBytes,timingSafeEqual} from 'node:crypto';
+import {openStore,digest,passwordMatches,passwordHash,transaction,audit,patientFrom,putEvent} from './store.mjs';
+const stages=['screened','reviewed','referred','diagnostics','treatment','closed'];
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json','.webmanifest':'application/manifest+json'};
+class ApiError extends Error{constructor(status,message){super(message);this.status=status;}}
+const fail=(status,message)=>{throw new ApiError(status,message);};
+function string(value,max,required=false){if(typeof value!=='string'||value.length>max||(required&&!value.trim()))fail(400,'Invalid or missing field.');return value.trim();}
+function safeEqual(a,b){const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);}
+async function body(req,max=3_000_000){let length=0;const chunks=[];for await(const chunk of req){length+=chunk.length;if(length>max)fail(413,'Request too large.');chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString());}catch{fail(400,'Invalid JSON.');}}
+function validatePatient(input){
+ const id=string(input.id,80,true);if(!/^AD-[A-Za-z0-9-]+$/.test(id))fail(400,'Invalid patient ID.');const age=input.age;if(!Number.isInteger(age)||age<1||age>120||input.consent!==true)fail(400,'Age and recorded consent are required.');
+ const photo=input.photo||null;if(photo&&(typeof photo!=='string'||photo.length>2_800_000||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)))fail(400,'Invalid photograph.');
+ return {id,name:string(input.name,100,true),age,village:string(input.village,100,true),phone:string(input.phone||'',20),history:string(input.history||'',2000),consent:true,photo,quality:input.quality&&typeof input.quality.pass==='boolean'?{pass:input.quality.pass}:null,stage:'screened',notes:'',facility:'',due:'',createdAt:new Date().toISOString(),timeline:[]};
+}
+function validateDate(value){if(!value)return '';if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T00:00:00Z'))||new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value)fail(400,'Invalid appointment date.');return value;}
+export async function startServer(options={}){
+ const directory=options.dataDir||process.env.DATA_DIR||resolve('.local');const db=openStore(directory);const root=await realpath(resolve('public'));const secure=process.env.COOKIE_SECURE==='true';const attempts=new Map();let delivering=false;
+ const setting=key=>db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value;const instanceId=db.prepare('SELECT value FROM meta WHERE key=?').get('instanceId').value;
+ function integration(){return {url:process.env.N8N_WEBHOOK_URL||setting('n8nUrl'),token:process.env.N8N_WEBHOOK_TOKEN||setting('n8nToken')};}
+ function session(req){const token=req.headers.cookie?.split(';').map(v=>v.trim()).find(v=>v.startsWith('drishti_session='))?.slice(16);if(!token)return null;return db.prepare('SELECT s.csrf,s.expires,s.token_hash,u.id,u.email,u.name,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND u.active=1').get(digest(token),Date.now());}
+ function userShape(s){return {id:s.id,email:s.email,name:s.name,role:s.role};}
+ function requireUser(req){const s=session(req);if(!s)fail(401,'Sign in to continue.');return s;}
+ function csrf(req,s){if(!safeEqual(req.headers['x-csrf-token'],s.csrf))fail(403,'Session verification failed. Reload and sign in again.');}
+ function allowed(s,list){if(!list.includes(s.role))fail(403,'Your account cannot perform this action.');}
+ function json(res,status,value,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(value));}
+ async function deliver(){
+  if(delivering)return {busy:true};const {url,token}=integration();if(!url||!token)fail(503,'Local n8n is not connected yet.');delivering=true;let delivered=0;
+  try{for(const row of db.prepare('SELECT * FROM events WHERE delivered_at IS NULL ORDER BY rowid LIMIT 25').all()){
+   try{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Webhook-Token':token},body:row.body,signal:AbortSignal.timeout(8000)});if(!response.ok)throw Error();const ack=await response.json();if(ack.accepted!==true||ack.eventId!==row.id)throw Error();db.prepare('UPDATE events SET delivered_at=?,attempts=attempts+1,last_error=NULL WHERE id=?').run(new Date().toISOString(),row.id);delivered++;}
+   catch{db.prepare('UPDATE events SET attempts=attempts+1,last_error=? WHERE id=?').run('n8n delivery failed; will retry.',row.id);break;}
+  }return {delivered,pending:db.prepare('SELECT count(*) AS n FROM events WHERE delivered_at IS NULL').get().n};}finally{delivering=false;}
+ }
+ const server=http.createServer(async(req,res)=>{
+  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+  try{
+   const path=new URL(req.url,'http://localhost').pathname,method=req.method;
+   if(path.startsWith('/api/')){
+    const origin=req.headers.origin;if(origin&&origin!==`http://${req.headers.host}`&&origin!==`https://${req.headers.host}`)fail(403,'Cross-origin request denied.');
+    if(path==='/api/health'&&method==='GET')return json(res,200,{ok:true,mode:'shared-demo',instanceId});
+    if(path==='/api/auth/login'&&method==='POST'){
+     const input=await body(req,4096);const email=string(input.email,150,true).toLowerCase(),password=string(input.password,256,true);const key=req.socket.remoteAddress;const now=Date.now();let rate=attempts.get(key);if(!rate||rate.until<now){rate={count:0,until:now+15*60_000};attempts.set(key,rate);}if(rate.count>=10)fail(429,'Too many sign-in attempts. Try again in 15 minutes.');rate.count++;
+     const u=db.prepare('SELECT * FROM users WHERE email=? AND active=1').get(email);const hash=u?.password_hash||passwordHash('unused-'+randomBytes(16).toString('hex'));if(!passwordMatches(password,hash)||!u)fail(401,'Email or password is incorrect.');attempts.delete(key);
+     const token=randomBytes(32).toString('base64url'),csrfToken=randomBytes(24).toString('base64url'),expires=now+12*60*60_000;db.prepare('DELETE FROM sessions WHERE expires<?').run(now);db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(digest(token),u.id,csrfToken,expires);audit(db,u,'auth.login');return json(res,200,{user:userShape(u),csrf:csrfToken,expires,instanceId},{'Set-Cookie':`drishti_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${secure?'; Secure':''}`});
+    }
+    if(path==='/api/automation/receipt'&&method==='POST'){
+     const token=setting('callbackToken')||process.env.N8N_CALLBACK_TOKEN;if(!token||!safeEqual(req.headers['x-automation-token'],token))fail(401,'Invalid automation credential.');const input=await body(req,4096);const event=db.prepare('SELECT * FROM events WHERE id=?').get(string(input.eventId,80,true));if(!event)fail(404,'Event not found.');db.prepare('INSERT OR IGNORE INTO automation_receipts VALUES(?,?,?,?)').run(event.id,event.patient_id,event.type,new Date().toISOString());return json(res,200,{accepted:true,eventId:event.id});
+    }
+    const s=requireUser(req);if(!['GET','HEAD'].includes(method))csrf(req,s);
+    if(path==='/api/auth/me'&&method==='GET')return json(res,200,{user:userShape(s),csrf:s.csrf,expires:s.expires,instanceId});
+    if(path==='/api/auth/logout'&&method==='POST'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(s.token_hash);return json(res,200,{ok:true},{'Set-Cookie':'drishti_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'});}
+    if(path==='/api/patients'&&method==='GET'){audit(db,s,'patients.list');return json(res,200,{patients:db.prepare('SELECT * FROM patients ORDER BY updated_at DESC').all().map(patientFrom)});}
+    if(path==='/api/patients'&&method==='POST'){
+     allowed(s,['worker']);const input=await body(req),p=validatePatient(input);const existing=db.prepare('SELECT * FROM patients WHERE id=?').get(p.id);if(existing){if(existing.created_by!==s.id)fail(409,'Patient ID already belongs to another screening.');return json(res,200,{patient:patientFrom(existing),duplicate:true});}
+     p.timeline=[{at:p.createdAt,text:'Screening received from health worker.',te:'ఆరోగ్య కార్యకర్త నుండి స్క్రీనింగ్ అందింది.'}];const now=new Date().toISOString();transaction(db,()=>{db.prepare('INSERT INTO patients VALUES(?,?,?,?,?)').run(p.id,JSON.stringify(p),1,s.id,now);putEvent(db,'screening.created',p);audit(db,s,'screening.created',p.id);});return json(res,201,{patient:patientFrom(db.prepare('SELECT * FROM patients WHERE id=?').get(p.id))});
+    }
+    const reviewMatch=path.match(/^\/api\/patients\/(AD-[A-Za-z0-9-]+)\/review$/);
+    if(reviewMatch&&method==='PATCH'){
+     allowed(s,['doctor']);const input=await body(req,16000);const row=db.prepare('SELECT * FROM patients WHERE id=?').get(reviewMatch[1]);if(!row)fail(404,'Patient not found.');if(!Number.isInteger(input.version)||input.version!==row.version)fail(409,'Another clinician updated this record. Refresh before saving.');const p=patientFrom(row);const stage=string(input.stage,30,true);if(!stages.includes(stage)||stage==='screened')fail(400,'Invalid care stage.');const notes=string(input.notes,4000,true),facility=string(input.facility||'',150),due=validateDate(input.due||'');if(['referred','diagnostics','treatment'].includes(stage)&&(!facility||!due))fail(400,'Facility and next appointment date are required.');
+     const now=new Date().toISOString();Object.assign(p,{stage,notes,facility,due:stage==='closed'?'':due});p.timeline.push({at:now,text:`Reviewed by ${s.name}: ${stage}.`,te:`${s.name} సమీక్ష: ${stage}.`});delete p.version;delete p.createdBy;delete p.updatedAt;transaction(db,()=>{db.prepare('UPDATE patients SET body=?,version=version+1,updated_at=? WHERE id=?').run(JSON.stringify(p),now,p.id);putEvent(db,stage==='referred'?'referral.created':'review.completed',p);audit(db,s,'review.completed',p.id);});return json(res,200,{patient:patientFrom(db.prepare('SELECT * FROM patients WHERE id=?').get(p.id))});
+    }
+    if(path==='/api/automation/status'&&method==='GET'){const {url,token}=integration();const counts=db.prepare('SELECT count(*) AS total,sum(CASE WHEN delivered_at IS NULL THEN 1 ELSE 0 END) AS pending FROM events').get();return json(res,200,{configured:Boolean(url&&token),pending:counts.pending||0,total:counts.total,receipts:db.prepare('SELECT count(*) AS n FROM automation_receipts').get().n,events:db.prepare('SELECT id,patient_id AS patientId,type,delivered_at AS deliveredAt,attempts,last_error AS lastError FROM events ORDER BY rowid DESC LIMIT 30').all()});}
+    if(path==='/api/automation/sync'&&method==='POST')return json(res,200,await deliver());
+    if(path==='/api/admin/audit'&&method==='GET'){allowed(s,['admin']);return json(res,200,{audit:db.prepare('SELECT a.*,u.name FROM audit a JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all()});}
+    fail(404,'API route not found.');
+   }
+   if(!['GET','HEAD'].includes(method))fail(405,'Method not allowed.');const pathname=decodeURIComponent(path);const file=resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+sep))fail(403,'Access denied.');let actual;try{actual=await realpath(file);}catch{fail(404,'Not found.');}if(!actual.startsWith(root+sep))fail(403,'Access denied.');const data=await readFile(actual);res.writeHead(200,{'Content-Type':types[extname(actual)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(method==='HEAD'?undefined:data);
+  }catch(e){if(!res.headersSent)json(res,e.status||500,{error:e.status?e.message:'The server could not complete the request.'});else res.end();}
+ });
+ const interval=setInterval(()=>{if(integration().url)deliver().catch(()=>{});},15000);interval.unref();server.on('close',()=>{clearInterval(interval);db.close();});await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port??Number(process.env.PORT||4173),options.host||process.env.HOST||'127.0.0.1',resolve);});return server;
+}

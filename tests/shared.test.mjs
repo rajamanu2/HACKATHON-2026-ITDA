@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {startServer} from '../src/server.mjs';
+test('shared database enforces login, CSRF, roles, versions and durable records',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'drishti-shared-'));let server=await startServer({port:0,dataDir:directory});let base=`http://127.0.0.1:${server.address().port}`;
+ const accounts=JSON.parse(await readFile(join(directory,'demo-accounts.json'),'utf8')).accounts;
+ const request=async(path,method='GET',data,auth,extra={})=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(auth?{Cookie:auth.cookie,'X-CSRF-Token':auth.csrf}:{}),...extra},...(data?{body:JSON.stringify(data)}:{})});return {status:r.status,body:await r.json(),cookie:r.headers.get('set-cookie')};};
+ try{
+  assert.equal((await request('/api/patients')).status,401);
+  const signIn=async role=>{const a=accounts.find(a=>a.role===role),r=await request('/api/auth/login','POST',{email:a.email,password:a.password});assert.equal(r.status,200);assert.match(r.cookie,/HttpOnly/);assert.match(r.cookie,/SameSite=Strict/);return {...r.body,cookie:r.cookie.split(';')[0]};};
+  const worker=await signIn('worker'),doctor=await signIn('doctor'),admin=await signIn('admin');
+  const p={id:'AD-TEST-SHARED',name:'Synthetic Patient',age:45,village:'Demo Village',history:'Synthetic only',consent:true};
+  assert.equal((await request('/api/patients','POST',p,{...worker,csrf:''})).status,403);
+  assert.equal((await request('/api/patients','POST',p,worker,{Origin:'https://attacker.example'})).status,403);
+  assert.equal((await request('/api/patients','POST',p,doctor)).status,403);
+  assert.equal((await request('/api/patients','POST',{...p,consent:false},worker)).status,400);
+  assert.equal((await request('/api/patients','POST',p,worker)).status,201);
+  assert.equal((await request('/api/patients','POST',p,worker)).body.duplicate,true);
+  let list=(await request('/api/patients','GET',undefined,doctor)).body.patients;assert.equal(list.length,1);assert.equal(list[0].name,p.name);
+  const review={stage:'referred',notes:'Synthetic clinical review',facility:'Demo facility',due:'2026-11-01',version:1};
+  assert.equal((await request(`/api/patients/${p.id}/review`,'PATCH',review,worker)).status,403);
+  assert.equal((await request(`/api/patients/${p.id}/review`,'PATCH',{...review,due:'2026-02-30'},doctor)).status,400);
+  assert.equal((await request(`/api/patients/${p.id}/review`,'PATCH',review,doctor)).status,200);
+  assert.equal((await request(`/api/patients/${p.id}/review`,'PATCH',review,doctor)).status,409);
+  list=(await request('/api/patients','GET',undefined,worker)).body.patients;assert.equal(list[0].stage,'referred');assert.equal(list[0].version,2);
+  const status=(await request('/api/automation/status','GET',undefined,worker)).body;assert.equal(status.pending,2);assert.equal(status.total,2);
+  assert.equal((await request('/api/admin/audit','GET',undefined,worker)).status,403);assert.ok((await request('/api/admin/audit','GET',undefined,admin)).body.audit.some(a=>a.action==='review.completed'));
+  assert.equal((await request('/api/automation/receipt','POST',{eventId:status.events[0].id})).status,401);
+  assert.equal((await request('/.local/demo-accounts.json')).status,404);
+  await new Promise(resolve=>server.close(resolve));server=await startServer({port:0,dataDir:directory});base=`http://127.0.0.1:${server.address().port}`;
+  list=(await request('/api/patients','GET',undefined,worker)).body.patients;assert.equal(list[0].version,2);
+  assert.equal((await request('/api/auth/logout','POST',{},worker)).status,200);assert.equal((await request('/api/patients','GET',undefined,worker)).status,401);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});

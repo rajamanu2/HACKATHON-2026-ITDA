@@ -1,0 +1,131 @@
+{
+  "name": "Aarogya Drishti - shared care event receipts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "drishti-events",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "intake",
+      "name": "Authenticated event intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "drishti-events",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiWebhookAuth",
+          "name": "Drishti webhook authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json.body;\nif (!event || !['screening.created','review.completed','referral.created'].includes(event.type) || typeof event.id !== 'string' || typeof event.patientId !== 'string') throw new Error('Invalid event');\nreturn [{json:{eventId:event.id}}];"
+      },
+      "id": "validate",
+      "name": "Validate minimal event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/automation/receipt",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "receipt",
+      "name": "Store idempotent app receipt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        770,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiCallbackAuth",
+          "name": "Drishti app callback authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ack",
+      "name": "Acknowledge intake only",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1030,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Authenticated event intake": {
+      "main": [
+        [
+          {
+            "node": "Validate minimal event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate minimal event": {
+      "main": [
+        [
+          {
+            "node": "Store idempotent app receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store idempotent app receipt": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge intake only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {},
+  "id": "drishtiLocalEvents"
+}

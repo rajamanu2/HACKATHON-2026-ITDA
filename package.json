@@ -1,0 +1,19 @@
+{
+  "name": "aarogya-drishti",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "install:n8n": "npm install --prefix .local/n8n-runtime n8n@2.44.6 --omit=dev --no-audit --no-fund",
+    "n8n": "node scripts/local-n8n.mjs",
+    "start:local": "powershell -NoProfile -File scripts/start-local.ps1",
+    "test:browser": "node tests/browser-check.mjs",
+    "configure:n8n": "node scripts/configure-local-n8n.mjs",
+    "test:n8n": "node tests/n8n-roundtrip.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

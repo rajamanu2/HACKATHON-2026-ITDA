@@ -1,0 +1,10 @@
+import {spawn} from 'node:child_process';
+import {resolve} from 'node:path';
+import {mkdirSync,existsSync,readFileSync,writeFileSync} from 'node:fs';
+import {randomBytes} from 'node:crypto';
+const directory=resolve('.local');mkdirSync(directory,{recursive:true});
+const file=resolve(directory,'n8n-runtime-secret.json');
+if(!existsSync(file))writeFileSync(file,JSON.stringify({encryptionKey:randomBytes(32).toString('hex')}),{flag:'wx',mode:0o600});
+const config=JSON.parse(readFileSync(file,'utf8'));
+const child=spawn(process.execPath,[resolve('.local/n8n-runtime/node_modules/n8n/bin/n8n'),...process.argv.slice(2)],{stdio:'inherit',env:{...process.env,NODE_COMPILE_CACHE:resolve('.local/node-compile-cache'),N8N_USER_FOLDER:resolve('.local/n8n-state'),N8N_ENCRYPTION_KEY:config.encryptionKey,N8N_HOST:'127.0.0.1',N8N_LISTEN_ADDRESS:'127.0.0.1',N8N_PORT:'5678',N8N_PROTOCOL:'http',N8N_SECURE_COOKIE:'false',N8N_DIAGNOSTICS_ENABLED:'false',N8N_VERSION_NOTIFICATIONS_ENABLED:'false',N8N_TEMPLATES_ENABLED:'false',N8N_PERSONALIZATION_ENABLED:'false',N8N_RUNNERS_MODE:'internal',EXECUTIONS_DATA_SAVE_ON_SUCCESS:'none',EXECUTIONS_DATA_SAVE_ON_ERROR:'none',EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS:'false',N8N_WEBHOOK_URL:'http://127.0.0.1:5678/',GENERIC_TIMEZONE:'Asia/Kolkata'}});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));child.on('exit',code=>process.exit(code??1));

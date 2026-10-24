@@ -1,0 +1,4 @@
+export function qualityMetrics(pixels,width,height){let sum=0,sum2=0,edges=0,n=0;for(let y=1;y<height;y++)for(let x=1;x<width;x++){let i=(y*width+x)*4;const v=(pixels[i]+pixels[i+1]+pixels[i+2])/3;const prev=(pixels[i-4]+pixels[i-3]+pixels[i-2])/3;sum+=v;sum2+=v*v;edges+=Math.abs(v-prev);n++;}const brightness=sum/n,contrast=Math.sqrt(Math.max(0,sum2/n-brightness*brightness)),detail=edges/n;return {brightness,contrast,detail,pass:brightness>45&&brightness<225&&contrast>18&&detail>3};}
+export function pendingEvents(events){return events.filter(e=>!e.delivered);}
+export function makeEvent(type,patient){return {id:crypto.randomUUID(),type,patientId:patient.id,createdAt:new Date().toISOString(),data:{stage:patient.stage,village:patient.village},delivered:false};}
+export function overdue(patient,today=new Date().toISOString().slice(0,10)){return Boolean(patient.due&&patient.due<today&&patient.stage!=='closed');}
