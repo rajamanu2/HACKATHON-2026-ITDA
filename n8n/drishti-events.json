@@ -27,7 +27,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const event = $input.first().json.body;\nif (!event || !['screening.created','review.completed','referral.created'].includes(event.type) || typeof event.id !== 'string' || typeof event.patientId !== 'string') throw new Error('Invalid event');\nreturn [{json:{eventId:event.id}}];"
+        "jsCode": "const event = $input.first().json.body;\nif (!event || !['screening.created','review.completed','referral.created','care.updated'].includes(event.type) || typeof event.id !== 'string' || typeof event.patientId !== 'string') throw new Error('Invalid event');\nreturn [{json:{eventId:event.id}}];"
       },
       "id": "validate",
       "name": "Validate minimal event",

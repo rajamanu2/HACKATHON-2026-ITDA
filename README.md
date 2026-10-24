@@ -1,9 +1,10 @@
 # Aarogya Drishti / ఆరోగ్య దృష్టి
 
-English/Telugu, offline-capable hackathon application with a glass interface, Saathi conversational intake, Android packaging, authenticated accounts, shared SQLite records and local n8n workflows. Requires Node.js 24 or newer. No clinical AI model is included.
+English/Telugu, offline-capable hackathon application with a glass interface, Saathi conversational intake, Android packaging, authenticated accounts, shared SQLite records and local n8n workflows. Requires Node.js 24 or newer. An optional local research image model is connected separately; it is not clinically validated. See [research AI setup and limitations](RESEARCH-AI.md).
 
 ## Android, conversational intake and video
 
+- [Poster requirements and acceptance checklist](HACKATHON-COVERAGE.md)
 - [Android build and device connection](ANDROID.md)
 - [Cloudflare and bulk team access](CLOUDFLARE.md)
 - `n8n/drishti-consultations.json`: doctor scheduling → meeting link preparation → authenticated callback → shared patient record.
