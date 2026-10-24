@@ -1,0 +1,4 @@
+{$PUBLIC_DOMAIN} {
+    encode gzip
+    reverse_proxy app:4173
+}

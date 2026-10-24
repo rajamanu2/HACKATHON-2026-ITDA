@@ -1,0 +1,51 @@
+name: Cloud container check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - cloud/**
+      - src/**
+      - scripts/local-n8n.mjs
+      - .github/workflows/cloud-check.yml
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - run: docker build -t drishti-cloud-check .
+      - name: Start isolated persistent-volume container
+        run: docker run -d --name care-check -p 127.0.0.1:54173:4173 --mount type=volume,source=care-check-data,target=/app/.local drishti-cloud-check
+      - name: Wait for app health and verify model architecture
+        run: |
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:54173/api/health > /tmp/care-health.json; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:54173/api/health
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:54173/api/patients)" = 401
+          docker exec care-check /opt/ai/bin/python scripts/research-ai.py --check
+      - name: Restart and verify persistent identity
+        run: |
+          docker restart care-check
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:54173/api/health > /tmp/care-health-after.json; then break; fi
+            sleep 2
+          done
+          node --input-type=module -e "import{readFileSync}from'node:fs';const a=JSON.parse(readFileSync('/tmp/care-health.json')),b=JSON.parse(readFileSync('/tmp/care-health-after.json'));if(a.instanceId!==b.instanceId)throw Error('Persistent identity changed');console.log('Persistent identity survived container restart.');"
+      - name: Show non-secret service logs on failure
+        if: failure()
+        run: docker logs --tail 100 care-check || true
+      - name: Clean isolated CI containers
+        if: always()
+        run: |
+          docker rm -f care-check || true
+          docker volume rm care-check-data || true

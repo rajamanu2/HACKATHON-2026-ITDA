@@ -1,0 +1,13 @@
+.git
+.local
+node_modules
+**/node_modules
+android
+dist
+test-results
+tests
+.agents
+.codex
+**/.env
+**/*.sqlite*
+**/*.log

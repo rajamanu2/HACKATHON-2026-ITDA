@@ -1,7 +1,7 @@
 import http from 'node:http';
 import {isIPv4} from 'node:net';
 import {readFile,realpath} from 'node:fs/promises';
-import {resolve,extname,sep} from 'node:path';
+import {resolve,extname,sep,basename} from 'node:path';
 import {randomBytes,timingSafeEqual,randomUUID,scrypt} from 'node:crypto';
 import {openStore,digest,passwordMatches,passwordHash,transaction,audit,patientFrom,putEvent} from './store.mjs';
 import {runResearchAI} from './research-ai.mjs';
@@ -97,7 +97,7 @@ export async function startServer(options={}){
     if(path==='/api/admin/audit'&&method==='GET'){allowed(s,['admin']);return json(res,200,{audit:db.prepare('SELECT a.*,u.name FROM audit a JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all()});}
     fail(404,'API route not found.');
    }
-   if(path==='/downloads/android'&&method==='GET'){try{const apk=await readFile(resolve('dist/android/Aarogya-Drishti-0.3.1-debug.apk'));res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':'attachment; filename="Aarogya-Drishti-0.3.1-debug.apk"','Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
+   if(path==='/downloads/android'&&method==='GET'){try{const apkPath=process.env.ANDROID_APK_PATH||resolve('dist/android/Aarogya-Drishti-0.3.1-debug.apk');const filename=basename(apkPath);if(!/^[A-Za-z0-9._-]+\.apk$/.test(filename))fail(500,'Android package filename is invalid.');const apk=await readFile(apkPath);res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
    if(!['GET','HEAD'].includes(method))fail(405,'Method not allowed.');const pathname=decodeURIComponent(path);const file=resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+sep))fail(403,'Access denied.');let actual;try{actual=await realpath(file);}catch{fail(404,'Not found.');}if(!actual.startsWith(root+sep))fail(403,'Access denied.');const data=await readFile(actual);res.writeHead(200,{'Content-Type':types[extname(actual)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(method==='HEAD'?undefined:data);
   }catch(e){if(!res.headersSent)json(res,e.status||500,{error:e.status?e.message:'The server could not complete the request.'});else res.end();}
  };

@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4173
+      COOKIE_SECURE: "true"
+      DATA_DIR: /app/.local
+    volumes:
+      - care-data:/app/.local
+    ports:
+      - "127.0.0.1:5678:5678"
+    expose:
+      - "4173"
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set your real domain in cloud/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+volumes:
+  care-data:
+  caddy-data:
+  caddy-config:

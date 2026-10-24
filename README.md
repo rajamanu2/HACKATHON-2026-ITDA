@@ -2,6 +2,10 @@
 
 English/Telugu, offline-capable hackathon application with a glass interface, Saathi conversational intake, Android packaging, authenticated accounts, shared SQLite records and local n8n workflows. Requires Node.js 24 or newer. An optional local research image model is connected separately; it is not clinically validated. See [research AI setup and limitations](RESEARCH-AI.md).
 
+## Permanent hosting
+
+[Cloud hosting package and deployment checklist](CLOUD-HOSTING.md). Prepared for a persistent cloud server; no permanent cloud deployment has been performed.
+
 ## Android, conversational intake and video
 
 - [Poster requirements and acceptance checklist](HACKATHON-COVERAGE.md)
