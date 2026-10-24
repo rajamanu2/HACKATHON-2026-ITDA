@@ -5,7 +5,7 @@ import {openStore,transaction} from '../src/store.mjs';
 const db=openStore(resolve('.local'));
 const get=key=>db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value;
 const webhook=get('n8nToken')||randomBytes(32).toString('base64url');const callback=get('callbackToken')||randomBytes(32).toString('base64url');
-transaction(db,()=>{for(const [key,value] of [['n8nUrl','http://127.0.0.1:5678/webhook/drishti-events'],['n8nToken',webhook],['callbackToken',callback]])db.prepare('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,value);});db.close();
+transaction(db,()=>{for(const [key,value] of [['n8nConsultationUrl','http://127.0.0.1:5678/webhook/drishti-consultations'],['n8nUrl','http://127.0.0.1:5678/webhook/drishti-events'],['n8nToken',webhook],['callbackToken',callback]])db.prepare('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,value);});db.close();
 const credentials=[{id:'drishtiWebhookAuth',name:'Drishti webhook authentication',type:'httpHeaderAuth',data:{name:'X-Webhook-Token',value:webhook}},{id:'drishtiCallbackAuth',name:'Drishti app callback authentication',type:'httpHeaderAuth',data:{name:'X-Automation-Token',value:callback}}];
 writeFileSync(resolve('.local/n8n-credentials.json'),JSON.stringify(credentials),{mode:0o600});
 const ownerFile=resolve('.local/n8n-owner.json');if(!existsSync(ownerFile))writeFileSync(ownerFile,JSON.stringify({email:'owner@drishti.local',firstName:'Local',lastName:'Administrator',password:'Drishti-'+randomBytes(24).toString('base64url')+'9!'},null,2),{flag:'wx',mode:0o600});

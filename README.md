@@ -1,6 +1,14 @@
 # Aarogya Drishti / ఆరోగ్య దృష్టి
 
-English/Telugu, offline-capable synthetic hackathon application with authenticated accounts, a shared SQLite database and local n8n event receipts. Requires Node.js 24 or newer. No clinical AI model is included.
+English/Telugu, offline-capable hackathon application with a glass interface, Saathi conversational intake, Android packaging, authenticated accounts, shared SQLite records and local n8n workflows. Requires Node.js 24 or newer. No clinical AI model is included.
+
+## Android, conversational intake and video
+
+- [Android build and device connection](ANDROID.md)
+- [Cloudflare and bulk team access](CLOUDFLARE.md)
+- `n8n/drishti-consultations.json`: doctor scheduling → meeting link preparation → authenticated callback → shared patient record.
+- Saathi asks questions offline and fills the registration form; the worker still reviews consent and saves.
+- The administrator’s Care team screen provisions worker/doctor accounts in batches of up to 100, with one-time credential download.
 
 ## Start
 
@@ -31,12 +39,14 @@ The project pins n8n 2.44.6 in `.local/n8n-runtime`, and keeps its database/encr
 ```powershell
 node scripts/local-n8n.mjs import:credentials --input=.local/n8n-credentials.json
 node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-events.json
+node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-consultations.json
 ```
 
 Then publish the workflow using:
 
 ```powershell
 node scripts/local-n8n.mjs publish:workflow --id=drishtiLocalEvents
+node scripts/local-n8n.mjs publish:workflow --id=drishtiVideoConsultations
 ```
 
 Restart the local n8n service after CLI publishing. You can also publish/activate the imported **Aarogya Drishti - shared care event receipts** workflow. See the actual local setup receipt in `test-results/verification.md` after setup is verified. Once configured, `npm run start:local` launches n8n in a hidden background process and runs the application in the current terminal. Do not start a second copy if the ports are already in use.
@@ -72,10 +82,12 @@ The server binds to loopback. Separate browser sessions on this PC can share rec
 npm test
 npm run test:browser
 node tests/n8n-roundtrip.mjs
+node tests/intake-browser.mjs
+node tests/video-roundtrip.mjs
 ```
 
 Browser checks require Playwright and Edge, with `PLAYWRIGHT_MODULE` / `BROWSER_PATH` overrides for other installations. The live n8n roundtrip check requires both local servers and creates a clearly named synthetic test patient; it verifies a cross-account review and duplicate receipt handling.
 
 ## Still outside scope
 
-Clinical AI, video calls, actual notification delivery, diagnostic report uploads, encrypted managed-device storage, facility-level tenant scopes, password recovery and internet production deployment remain future work. This application is not approved for clinical patient data.
+Clinical AI, verified two-person video/audio, actual notification delivery, diagnostic report uploads, encrypted managed-device patient storage, facility-level tenant scopes, password recovery and public production deployment remain future work. Consultation scheduling, n8n link preparation and join interfaces are implemented; the actual call is not yet verified. A temporary Cloudflare HTTPS test tunnel is running; a permanent account-backed hostname awaits the real domain and authorization. Public login was not verified because automatic approval review blocked transmitting account credentials through the tunnel; local login and shared records passed. This application is not approved for clinical patient data.

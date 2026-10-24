@@ -1,0 +1,15 @@
+plugins { id 'com.android.application' }
+def quickTunnelFile = file('../../.local/cloudflare/quick-tunnel.json')
+def configuredServer = quickTunnelFile.exists() ? new groovy.json.JsonSlurper().parse(quickTunnelFile).url.toString() : ''
+if (!(configuredServer ==~ /https:\/\/[a-z0-9-]+\.trycloudflare\.com/)) configuredServer = ''
+
+android {
+    namespace 'in.itda.drishti'
+    compileSdk 35
+    defaultConfig { applicationId 'in.itda.drishti'; minSdk 26; targetSdk 35; versionCode 3; versionName '0.3.0'; buildConfigField 'String', 'DEFAULT_SERVER_URL', '"' + configuredServer + '"' }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes { release { minifyEnabled false } }
+}
+tasks.register('syncWebAssets', Copy) { from '../../public'; into 'src/main/assets/web'; exclude 'sw.js' }
+preBuild.dependsOn syncWebAssets

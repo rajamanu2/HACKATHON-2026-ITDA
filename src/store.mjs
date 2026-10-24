@@ -16,6 +16,7 @@ export function openStore(directory){
  CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,patient_id TEXT NOT NULL REFERENCES patients(id),type TEXT NOT NULL,body TEXT NOT NULL,delivered_at TEXT,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT);
  CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT,actor TEXT NOT NULL,action TEXT NOT NULL,record_id TEXT,at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS automation_receipts(event_id TEXT PRIMARY KEY,patient_id TEXT NOT NULL,type TEXT NOT NULL,received_at TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS consultations(id TEXT PRIMARY KEY,patient_id TEXT NOT NULL REFERENCES patients(id),scheduled_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'preparing',room_url TEXT,created_by TEXT NOT NULL REFERENCES users(id),event_id TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
  if(!db.prepare('SELECT value FROM meta WHERE key=?').get('instanceId'))db.prepare('INSERT INTO meta VALUES(?,?)').run('instanceId',randomUUID());
  if(!db.prepare('SELECT id FROM users LIMIT 1').get()){

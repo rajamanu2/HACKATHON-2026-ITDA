@@ -23,3 +23,14 @@ Worker device records use a stable ID; retry after an ambiguous upload response 
 The server retries pending n8n deliveries every 15 seconds. A callback receipt has a unique event ID. A crash after receipt acceptance but before outbox acknowledgment may rerun the workflow; receipt insertion is idempotent. External actions such as SMS must add separate idempotency handling. The webhook excludes names, phone numbers, histories and photographs.
 
 Security baseline: scrypt password hashing; SHA-256 hashes of random session tokens; HttpOnly SameSite cookies; CSRF tokens for session writes; origin checks; a 12-hour absolute expiry; login throttling; fixed server roles; private integration settings and separate automation credentials. The local setup binds to loopback, uses HTTP, and does not encrypt SQLite or browser caches. These are synthetic-demo boundaries, not a clinical production approval.
+
+
+## Android, intake and consultation extensions
+
+Android bundles public UI files under a fixed local HTTPS origin and uses a route-limited Java bridge to the configured backend. Session cookies are Android Keystore encrypted; WebView patient data is still an unencrypted local cache for synthetic use. Native camera/gallery and speech intents feed the same form workflow. A separate video activity has camera/microphone permissions and no patient API bridge.
+
+Saathi is a local state machine over seven intake fields. Answers are validated, drafts are account scoped, and consent/submission remain user actions. No medical model or LLM diagnosis is claimed.
+
+The consultations table stores requested appointments. Doctor creation and a consultation.requested event are transactional. The separate authenticated n8n workflow returns an event-specific Jitsi URL to a protected callback; only that callback changes the appointment to ready. A unique receipt prevents duplicate callback rows. Ready means link prepared, not a connected call.
+
+Administrator bulk provisioning validates a complete batch before committing accounts. New passwords are randomly generated and asynchronously hashed. Login hashing is asynchronous, and per-account/IP throttling avoids one shared ten-attempt bucket across the team. Cloudflare setup is prepared but inactive pending the real hostname and browser authorization. It tunnels the existing host; there is no Workers/D1 migration or demonstrated mass-load capacity.

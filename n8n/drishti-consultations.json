@@ -1,0 +1,131 @@
+{
+  "name": "Aarogya Drishti - video consultation preparation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "drishti-consultations",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "intake",
+      "name": "Authenticated event intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "drishti-consultations",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiWebhookAuth",
+          "name": "Drishti webhook authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json.body;\nif (!event || event.type !== 'consultation.requested' || !/^[0-9a-f-]{36}$/.test(event.id) || typeof event.data?.consultationId !== 'string') throw new Error('Invalid consultation request');\n// Jitsi rooms are created when participants join; this prepares a unique room link.\n// No patient names, phone numbers, images or histories go to the video provider.\nreturn [{json:{eventId:event.id,roomUrl:'https://meet.jit.si/Drishti-'+event.id}}];"
+      },
+      "id": "validate",
+      "name": "Prepare private room link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/consultations/ready",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "receipt",
+      "name": "Attach room to shared patient record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        770,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiCallbackAuth",
+          "name": "Drishti app callback authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ack",
+      "name": "Acknowledge intake only",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1030,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Authenticated event intake": {
+      "main": [
+        [
+          {
+            "node": "Prepare private room link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare private room link": {
+      "main": [
+        [
+          {
+            "node": "Attach room to shared patient record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach room to shared patient record": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge intake only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {},
+  "id": "drishtiVideoConsultations"
+}

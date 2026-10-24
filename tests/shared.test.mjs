@@ -27,6 +27,14 @@ test('shared database enforces login, CSRF, roles, versions and durable records'
   assert.equal((await request(`/api/patients/${p.id}/review`,'PATCH',review,doctor)).status,409);
   list=(await request('/api/patients','GET',undefined,worker)).body.patients;assert.equal(list[0].stage,'referred');assert.equal(list[0].version,2);
   const status=(await request('/api/automation/status','GET',undefined,worker)).body;assert.equal(status.pending,2);assert.equal(status.total,2);
+  const schedule={patientId:p.id,scheduledAt:new Date(Date.now()+3600000).toISOString()};
+  assert.equal((await request('/api/consultations','POST',schedule,worker)).status,403);
+  assert.equal((await request('/api/consultations','POST',schedule,doctor)).status,201);
+  const consultations=(await request('/api/consultations?patientId='+p.id,'GET',undefined,worker)).body.consultations;assert.equal(consultations.length,1);assert.equal(consultations[0].status,'preparing');assert.equal(consultations[0].roomUrl,null);
+  assert.equal((await request('/api/admin/users/bulk','POST',{users:[{email:'new-worker@example.org',name:'New Worker',role:'worker'}]},worker)).status,403);
+  const batch=await request('/api/admin/users/bulk','POST',{users:[{email:'new-worker@example.org',name:'New Worker',role:'worker'},{email:'new-doctor@example.org',name:'New Doctor',role:'doctor'}]},admin);assert.equal(batch.status,201);assert.equal(batch.body.accounts.length,2);assert.equal((await request('/api/auth/login','POST',{email:batch.body.accounts[0].email,password:batch.body.accounts[0].password})).status,200);
+  assert.equal((await request('/api/admin/users/bulk','POST',{users:[{email:'new-worker@example.org',name:'Duplicate',role:'worker'}]},admin)).status,409);
+  assert.equal((await request('/api/admin/users/bulk','POST',{users:[{email:'new-admin@example.org',name:'Not Allowed',role:'admin'}]},admin)).status,400);
   assert.equal((await request('/api/admin/audit','GET',undefined,worker)).status,403);assert.ok((await request('/api/admin/audit','GET',undefined,admin)).body.audit.some(a=>a.action==='review.completed'));
   assert.equal((await request('/api/automation/receipt','POST',{eventId:status.events[0].id})).status,401);
   assert.equal((await request('/.local/demo-accounts.json')).status,404);

@@ -1,6 +1,6 @@
 {
   "name": "aarogya-drishti",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -11,7 +11,10 @@
     "start:local": "powershell -NoProfile -File scripts/start-local.ps1",
     "test:browser": "node tests/browser-check.mjs",
     "configure:n8n": "node scripts/configure-local-n8n.mjs",
-    "test:n8n": "node tests/n8n-roundtrip.mjs"
+    "test:n8n": "node tests/n8n-roundtrip.mjs",
+    "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android.ps1",
+    "test:intake": "node tests/intake-browser.mjs",
+    "test:video": "node tests/video-roundtrip.mjs"
   },
   "engines": {
     "node": ">=24"
