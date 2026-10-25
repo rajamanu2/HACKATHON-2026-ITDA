@@ -1,4 +1,4 @@
-param([string]$SdkDirectory = "$env:LOCALAPPDATA\Android\Sdk", [string]$GradleCommand = '', [int]$VersionCode=7, [string]$VersionName='0.3.4', [string]$WebDirectory='')
+param([string]$SdkDirectory = "$env:LOCALAPPDATA\Android\Sdk", [string]$GradleCommand = '', [int]$VersionCode=8, [string]$VersionName='0.3.5', [string]$WebDirectory='')
 $ErrorActionPreference = 'Stop'
 if ($VersionCode -lt 4 -or $VersionName -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid APK version.' }
 $workspaceDirectory = Split-Path $PSScriptRoot -Parent

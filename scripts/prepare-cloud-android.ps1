@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ServerUrl,[string]$SdkDirectory="$env:LOCALAPPDATA\Android\Sdk",[string]$GradleCommand='',[int]$VersionCode=7,[string]$VersionName='0.3.4',[string]$WebDirectory='')
+param([Parameter(Mandatory=$true)][string]$ServerUrl,[string]$SdkDirectory="$env:LOCALAPPDATA\Android\Sdk",[string]$GradleCommand='',[int]$VersionCode=8,[string]$VersionName='0.3.5',[string]$WebDirectory='')
 $ErrorActionPreference='Stop'
 $workspaceDirectory=Split-Path $PSScriptRoot -Parent
 Set-Location $workspaceDirectory

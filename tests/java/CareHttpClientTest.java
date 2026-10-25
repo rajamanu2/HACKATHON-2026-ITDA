@@ -23,13 +23,21 @@ public final class CareHttpClientTest {
    }
    if(path.endsWith("/review"))check(exchange.getRequestMethod().equals("POST"),"PATCH uses supported POST alias");
    if(mode.get().equals("redirect")){exchange.getResponseHeaders().set("Location","/outside");exchange.sendResponseHeaders(302,-1);return;}
+   // A cloud proxy can append another cookie after the application's session.
+   exchange.getResponseHeaders().add("Set-Cookie","drishti_session=fixture-session; HttpOnly; Path=/; Max-Age=43200");
+   exchange.getResponseHeaders().add("Set-Cookie","__cf_bm=fixture-proxy-cookie; HttpOnly; Path=/");
    byte[] bytes=json.getBytes(StandardCharsets.UTF_8);exchange.getResponseHeaders().set("Content-Type",mode.get().equals("html")?"text/html":"application/json; charset=utf-8");
    if(mode.get().equals("gzip")){ByteArrayOutputStream out=new ByteArrayOutputStream();try(GZIPOutputStream gzip=new GZIPOutputStream(out)){gzip.write(bytes);}bytes=out.toByteArray();exchange.getResponseHeaders().set("Content-Encoding","gzip");}
    exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);
   }finally{exchange.close();}});
   server.start();String base="http://127.0.0.1:"+server.getAddress().getPort();
   try{
-   check(CareHttpClient.request(base,"/api/health","GET","null","","").status==200,"health request");
+   CareHttpClient.Response health=CareHttpClient.request(base,"/api/health","GET","null","","");
+   check(health.status==200,"health request");
+   check(health.setCookie!=null&&health.setCookie.startsWith("drishti_session=fixture-session;"),"app session selected when Cloudflare also sets a cookie");
+   check(CareHttpClient.sessionCookie(java.util.Map.of("set-cookie",java.util.List.of("__cf_bm=proxy-only; Max-Age=0")))==null,"proxy-only response cannot replace or clear app session");
+   check(CareHttpClient.sessionCookie(java.util.Map.of("Set-Cookie",java.util.List.of("drishti_session=; Max-Age=0","__cf_bm=proxy"))).contains("Max-Age=0"),"app logout cookie retained");
+   check(CareHttpClient.sessionCookie(java.util.Map.of("Set-Cookie",java.util.List.of("__cf_bm=proxy","drishti_session=reverse; Max-Age=43200"))).startsWith("drishti_session=reverse"),"both header orders supported");
    check(CareHttpClient.request(base,"/api/auth/login","POST","{\"name\":\"తెలుగు\"}","fixture-cookie","fixture-csrf").status==401,"HTTP 401 stays an auth error");
    CareHttpClient.request(base,"/api/patients/AD-TEST/review","PATCH","{}","","");
    mode.set("gzip");check(CareHttpClient.request(base,"/api/health","GET","null","","").body.contains("instanceId"),"gzip decoded");

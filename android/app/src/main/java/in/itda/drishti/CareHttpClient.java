@@ -24,6 +24,18 @@ final class CareHttpClient {
   final int status;final String body,setCookie;
   Response(int status,String body,String cookie){this.status=status;this.body=body;this.setCookie=cookie;}
  }
+ static String sessionCookie(java.util.Map<String,java.util.List<String>> headers){
+  for(java.util.Map.Entry<String,java.util.List<String>> header:headers.entrySet()){
+   if(header.getKey()==null||!header.getKey().equalsIgnoreCase("Set-Cookie")||header.getValue()==null)continue;
+   for(String value:header.getValue()){
+    if(value==null)continue;
+    try{for(java.net.HttpCookie parsed:java.net.HttpCookie.parse(value)){
+     if(parsed.getName().equals("drishti_session"))return "drishti_session="+parsed.getValue()+(parsed.getMaxAge()>=0?"; Max-Age="+parsed.getMaxAge():"");
+    }}catch(IllegalArgumentException ignored){/* Ignore an invalid unrelated proxy cookie. */}
+   }
+  }
+  return null;
+ }
  static Response request(String base,String path,String method,String body,String cookie,String csrf) throws IOException {
   if(!allowed(path,method,body))throw new IOException("Invalid app request.");
   URL url=new URL(base+path);
@@ -36,7 +48,7 @@ final class CareHttpClient {
    connection.setRequestProperty("Accept","application/json");
    connection.setRequestProperty("Accept-Encoding","identity");
    connection.setRequestProperty("Content-Type","application/json; charset=utf-8");
-   connection.setRequestProperty("User-Agent","AarogyaDrishti-Android/0.3.1");
+   connection.setRequestProperty("User-Agent","AarogyaDrishti-Android/0.3.5");
    if(cookie!=null&&!cookie.isEmpty())connection.setRequestProperty("Cookie",cookie);
    if(csrf!=null&&!csrf.isEmpty())connection.setRequestProperty("X-CSRF-Token",csrf);
    if(!method.equals("GET")){
@@ -55,7 +67,7 @@ final class CareHttpClient {
    try(InputStream input="gzip".equalsIgnoreCase(connection.getContentEncoding())?new GZIPInputStream(raw):raw){
     ByteArrayOutputStream buffer=new ByteArrayOutputStream();byte[] bytes=new byte[8192];int count,total=0;
     while((count=input.read(bytes))!=-1){total+=count;if(total>30000000)throw new IOException("Care record response is too large.");buffer.write(bytes,0,count);}
-    return new Response(status,new String(buffer.toByteArray(),StandardCharsets.UTF_8),connection.getHeaderField("Set-Cookie"));
+    return new Response(status,new String(buffer.toByteArray(),StandardCharsets.UTF_8),sessionCookie(connection.getHeaderFields()));
    }
   }finally{connection.disconnect();}
  }

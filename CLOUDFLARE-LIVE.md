@@ -10,11 +10,11 @@ The public app login and health endpoint are accessible. Patient APIs require an
 
 Private credentials are in `.local/Cloudflare-Care-50-Accounts.csv` and `.local/cloudflare-care-accounts.json`, outside the app bundle, public download and source repositories. Distribute each person only their assigned account. The hosting service receives password hashes as secret runtime values; plaintext passwords are never in the APK or website assets. No local patient database was migrated.
 
-## Android 0.3.4 / code 7
+## Android 0.3.5 / code 8
 
 - Package `in.itda.drishti`, same signer as the preceding APK. Install over the existing app; do not uninstall or clear app data.
 - The built default is the public HTTPS website above. On upgrade, use **Use latest address → Test & connect** if the app asks to replace its saved old address. Sign in using a new cloud account.
-- SHA-256: `6c6c009bed70423791d38586040629e22cf2b9021856fe6c64f4bdb714223f14`.
+- SHA-256: `a699b2395d95826421bd73a4b4660c5210b962fb12ac66f9de622bca3b86e835`.
 - Build, lint, signature, version and embedded HTTPS address verified. Real handset installation is still a user check; no claim of successful handset receipt or a completed two-person video call is made.
 
 ## Cloud profile

@@ -1,10 +1,12 @@
-# Latest cloud APK: 0.3.4 (code 7)
+# Latest cloud APK: 0.3.5 (code 8)
 
-[Download the cloud-connected APK](https://github.com/rajamanu2/HACKATHON-2026-ITDA/raw/refs/heads/main/downloads/Aarogya-Drishti-cloud.apk)
+[Download the cloud-connected APK](https://github.com/rajamanu2/HACKATHON-2026-ITDA/raw/refs/heads/main/downloads/Aarogya-Drishti-0.3.5.apk)
+
+Fixes the login loop caused by selecting a Cloudflare proxy cookie instead of drishti_session. Regression tests cover both header orders, unrelated cookies and logout. Live login/session/workspace checks passed through the actual Java transport.
 
 Uses the live Cloudflare HTTPS care server, independent of the PC. Fifty new care-team accounts are configured; use the private account list supplied by the administrator. Same signer: update the installed app without uninstalling. If prompted, select Use latest address and Test & connect. See [cloud deployment details](../CLOUDFLARE-LIVE.md).
 
-SHA-256: `6c6c009bed70423791d38586040629e22cf2b9021856fe6c64f4bdb714223f14`.
+SHA-256: `a699b2395d95826421bd73a4b4660c5210b962fb12ac66f9de622bca3b86e835`.
 
 The older LAN APK below is retained for history; use the cloud link above for the hackathon.
 
