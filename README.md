@@ -4,7 +4,7 @@ English/Telugu, offline-capable hackathon application with a glass interface, Sa
 
 ## Permanent hosting
 
-[Cloud hosting package and deployment checklist](CLOUD-HOSTING.md). Prepared for a persistent cloud server; no permanent cloud deployment has been performed.
+[Live Cloudflare care server and APK](CLOUDFLARE-LIVE.md). The hackathon cloud profile is deployed with 50 care-team accounts and shared D1 records. The full Node/n8n/Python VM package remains separate and undeployed.
 
 ## Android, conversational intake and video
 

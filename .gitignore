@@ -12,3 +12,4 @@ android/app/src/main/assets/web/
 dist/
 *.apk
 *.aab
+care-cloudflare/

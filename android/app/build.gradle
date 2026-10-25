@@ -12,5 +12,5 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false; if(configuredServer.startsWith('http:')) buildConfigField 'String', 'DEFAULT_SERVER_URL', '""' } }
 }
-tasks.register('syncWebAssets', Copy) { from '../../public'; into 'src/main/assets/web'; exclude 'sw.js' }
+tasks.register('syncWebAssets', Copy) { from (project.findProperty('careWebDirectory') ?: '../../public'); into 'src/main/assets/web'; exclude 'sw.js' }
 preBuild.dependsOn syncWebAssets

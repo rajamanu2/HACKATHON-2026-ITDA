@@ -1,4 +1,4 @@
-param([string]$SdkDirectory = "$env:LOCALAPPDATA\Android\Sdk", [string]$GradleCommand = '', [int]$VersionCode=4, [string]$VersionName='0.3.1')
+param([string]$SdkDirectory = "$env:LOCALAPPDATA\Android\Sdk", [string]$GradleCommand = '', [int]$VersionCode=7, [string]$VersionName='0.3.4', [string]$WebDirectory='')
 $ErrorActionPreference = 'Stop'
 if ($VersionCode -lt 4 -or $VersionName -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid APK version.' }
 $workspaceDirectory = Split-Path $PSScriptRoot -Parent
@@ -10,7 +10,10 @@ if (-not $GradleCommand) {
 }
 $sdkProperty = 'sdk.dir=' + $SdkDirectory.Replace('\','/')
 Set-Content -LiteralPath 'android/local.properties' -Value $sdkProperty -Encoding ascii
-& $GradleCommand -p android --no-daemon "-PcareVersionCode=$VersionCode" "-PcareVersionName=$VersionName" assembleDebug lintDebug
+$buildArguments=@("-p","android","--no-daemon","-PcareVersionCode=$VersionCode","-PcareVersionName=$VersionName")
+if ($WebDirectory) { $buildArguments += "-PcareWebDirectory=$WebDirectory" }
+$buildArguments += @("assembleDebug","lintDebug")
+& $GradleCommand @buildArguments
 if ($LASTEXITCODE -ne 0) { throw 'Android build failed.' }
 New-Item -ItemType Directory -Path 'dist/android' -Force | Out-Null
 $apkOutput=Join-Path $workspaceDirectory "dist/android/Aarogya-Drishti-$VersionName-debug.apk"
