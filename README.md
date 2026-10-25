@@ -10,6 +10,7 @@ English/Telugu, offline-capable hackathon application with a glass interface, Sa
 
 - [Poster requirements and acceptance checklist](HACKATHON-COVERAGE.md)
 - [Android build and device connection](ANDROID.md)
+- [Telugu/English patient phone intake with n8n](VOICE-CALLING.md) — Bolna adapter and shared intake forms; paid calling disabled until provider setup and budget approval.
 - [Cloudflare and bulk team access](CLOUDFLARE.md)
 - `n8n/drishti-consultations.json`: doctor scheduling → meeting link preparation → authenticated callback → shared patient record.
 - Saathi asks questions offline and fills the registration form; the worker still reviews consent and saves.
@@ -45,6 +46,7 @@ The project pins n8n 2.44.6 in `.local/n8n-runtime`, and keeps its database/encr
 node scripts/local-n8n.mjs import:credentials --input=.local/n8n-credentials.json
 node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-events.json
 node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-consultations.json
+node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-voice-intake.json
 ```
 
 Then publish the workflow using:
@@ -52,6 +54,7 @@ Then publish the workflow using:
 ```powershell
 node scripts/local-n8n.mjs publish:workflow --id=drishtiLocalEvents
 node scripts/local-n8n.mjs publish:workflow --id=drishtiVideoConsultations
+node scripts/local-n8n.mjs publish:workflow --id=drishtiVoiceIntake
 ```
 
 Restart the local n8n service after CLI publishing. You can also publish/activate the imported **Aarogya Drishti - shared care event receipts** workflow. See the actual local setup receipt in `test-results/verification.md` after setup is verified. Once configured, `npm run start:local` launches n8n in a hidden background process and runs the application in the current terminal. Do not start a second copy if the ports are already in use.

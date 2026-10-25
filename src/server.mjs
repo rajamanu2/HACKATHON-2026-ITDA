@@ -5,8 +5,9 @@ import {resolve,extname,sep,basename} from 'node:path';
 import {randomBytes,timingSafeEqual,randomUUID,scrypt} from 'node:crypto';
 import {openStore,digest,passwordMatches,passwordHash,transaction,audit,patientFrom,putEvent} from './store.mjs';
 import {runResearchAI} from './research-ai.mjs';
+import {voiceIntake} from './voice-intake.mjs';
 const stages=['screened','reviewed','referred','diagnostics','treatment','closed'];
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json','.webmanifest':'application/manifest+json'};
+const types={'.ttf':'font/ttf','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json','.webmanifest':'application/manifest+json'};
 class ApiError extends Error{constructor(status,message){super(message);this.status=status;}}
 const fail=(status,message)=>{throw new ApiError(status,message);};
 function string(value,max,required=false){if(typeof value!=='string'||value.length>max||(required&&!value.trim()))fail(400,'Invalid or missing field.');return value.trim();}
@@ -24,6 +25,7 @@ export async function startServer(options={}){
  const infer=options.researchAI||runResearchAI;let aiBusy=false,aiStatusPromise=null,aiCheckedAt=0;
  const directory=options.dataDir||process.env.DATA_DIR||resolve('.local');const db=openStore(directory);const root=await realpath(resolve('public'));const secure=process.env.COOKIE_SECURE==='true';const attempts=new Map();let delivering=false;const dummyPasswordHash=passwordHash(randomBytes(32).toString('hex'));
  const setting=key=>db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value;const instanceId=db.prepare('SELECT value FROM meta WHERE key=?').get('instanceId').value;
+ const voice=voiceIntake({db,fail,fetcher:options.voiceFetch,config:options.voiceConfig||process.env});
  function integration(){return {url:process.env.N8N_WEBHOOK_URL||setting('n8nUrl'),token:process.env.N8N_WEBHOOK_TOKEN||setting('n8nToken')};}
  function session(req){const token=req.headers.cookie?.split(';').map(v=>v.trim()).find(v=>v.startsWith('drishti_session='))?.slice(16);if(!token)return null;return db.prepare('SELECT s.csrf,s.expires,s.token_hash,u.id,u.email,u.name,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND u.active=1').get(digest(token),Date.now());}
  function userShape(s){return {id:s.id,email:s.email,name:s.name,role:s.role};}
@@ -34,7 +36,7 @@ export async function startServer(options={}){
  async function deliver(){
   if(delivering)return {busy:true};const {url,token}=integration();if(!url||!token)fail(503,'Local n8n is not connected yet.');delivering=true;let delivered=0;
   try{for(const row of db.prepare('SELECT * FROM events WHERE delivered_at IS NULL ORDER BY rowid LIMIT 25').all()){
-   try{const eventUrl=row.type==='consultation.requested'?(setting('n8nConsultationUrl')||url.replace(/drishti-events$/, 'drishti-consultations')):url;const response=await fetch(eventUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Webhook-Token':token},body:row.body,signal:AbortSignal.timeout(8000)});if(!response.ok)throw Error();const ack=await response.json();if(ack.accepted!==true||ack.eventId!==row.id)throw Error();db.prepare('UPDATE events SET delivered_at=?,attempts=attempts+1,last_error=NULL WHERE id=?').run(new Date().toISOString(),row.id);delivered++;}
+   try{const eventUrl=row.type==='voice.requested'?(setting('n8nVoiceUrl')||url.replace(/drishti-events$/, 'drishti-voice-intake')):row.type==='consultation.requested'?(setting('n8nConsultationUrl')||url.replace(/drishti-events$/, 'drishti-consultations')):url;const response=await fetch(eventUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Webhook-Token':token},body:row.body,signal:AbortSignal.timeout(8000)});if(!response.ok)throw Error();const ack=await response.json();if(ack.accepted!==true||ack.eventId!==row.id)throw Error();db.prepare('UPDATE events SET delivered_at=?,attempts=attempts+1,last_error=NULL WHERE id=?').run(new Date().toISOString(),row.id);delivered++;}
    catch{db.prepare('UPDATE events SET attempts=attempts+1,last_error=? WHERE id=?').run('n8n delivery failed; will retry.',row.id);break;}
   }return {delivered,pending:db.prepare('SELECT count(*) AS n FROM events WHERE delivered_at IS NULL').get().n};}finally{delivering=false;}
  }
@@ -56,7 +58,17 @@ export async function startServer(options={}){
     if(path==='/api/consultations/ready'&&method==='POST'){
      const token=setting('callbackToken')||process.env.N8N_CALLBACK_TOKEN;if(!token||!safeEqual(req.headers['x-automation-token'],token))fail(401,'Invalid automation credential.');const input=await body(req,4096);const event=db.prepare('SELECT * FROM events WHERE id=? AND type=?').get(string(input.eventId,80,true),'consultation.requested');if(!event)fail(404,'Consultation event not found.');const roomUrl=string(input.roomUrl,500,true);const expected='https://meet.jit.si/Drishti-'+event.id;if(roomUrl!==expected)fail(400,'Unexpected consultation room.');transaction(db,()=>{db.prepare('UPDATE consultations SET status=?,room_url=? WHERE event_id=?').run('ready',roomUrl,event.id);db.prepare('INSERT OR IGNORE INTO automation_receipts VALUES(?,?,?,?)').run(event.id,event.patient_id,event.type,new Date().toISOString());});return json(res,200,{accepted:true,eventId:event.id});
     }
+    if(['/api/voice/dispatch','/api/voice/reconcile'].includes(path)&&method==='POST'){
+     const token=setting('callbackToken')||process.env.N8N_CALLBACK_TOKEN;
+     if(!loopback||req.headers['x-forwarded-for']||req.headers['cf-connecting-ip']||!token||!safeEqual(req.headers['x-automation-token'],token))fail(401,'Private automation access required.');
+     const input=await body(req,4096);return json(res,200,path.endsWith('/dispatch')?await voice.dispatch(string(input.eventId,80,true)):await voice.reconcile());
+    }
     const s=requireUser(req);if(!['GET','HEAD'].includes(method))csrf(req,s);
+    if(path==='/api/voice/status'&&method==='GET')return json(res,200,voice.status());
+    if(path==='/api/voice/calls'&&method==='POST')return json(res,201,{call:voice.create(await body(req,4096),s)});
+    if(path==='/api/voice/calls'&&method==='GET'){
+     const id=new URL(req.url,'http://localhost').searchParams.get('patientId');if(!/^AD-[A-Za-z0-9-]+$/.test(id||''))fail(400,'Patient ID required.');return json(res,200,{calls:voice.list(id)});
+    }
     if(path==='/api/ai/status'&&method==='GET'){if(!aiStatusPromise||Date.now()-aiCheckedAt>60000){aiCheckedAt=Date.now();aiStatusPromise=infer().catch(()=>({available:false,researchOnly:true,clinicallyValidated:false}));}return json(res,200,await aiStatusPromise);}
     const aiMatch=path.match(/^\/api\/patients\/(AD-[A-Za-z0-9-]+)\/research-ai$/);
     if(aiMatch&&method==='POST'){
@@ -97,7 +109,7 @@ export async function startServer(options={}){
     if(path==='/api/admin/audit'&&method==='GET'){allowed(s,['admin']);return json(res,200,{audit:db.prepare('SELECT a.*,u.name FROM audit a JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 100').all()});}
     fail(404,'API route not found.');
    }
-   if(path==='/downloads/android'&&method==='GET'){try{const apkPath=process.env.ANDROID_APK_PATH||resolve('dist/android/Aarogya-Drishti-0.3.1-debug.apk');const filename=basename(apkPath);if(!/^[A-Za-z0-9._-]+\.apk$/.test(filename))fail(500,'Android package filename is invalid.');const apk=await readFile(apkPath);res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
+   if(path==='/downloads/android'&&method==='GET'){try{const apkPath=process.env.ANDROID_APK_PATH||resolve('dist/android/Aarogya-Drishti-0.3.3-debug.apk');const filename=basename(apkPath);if(!/^[A-Za-z0-9._-]+\.apk$/.test(filename))fail(500,'Android package filename is invalid.');const apk=await readFile(apkPath);res.writeHead(200,{'Content-Type':'application/vnd.android.package-archive','Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'});return res.end(apk);}catch{fail(404,'Android package has not been built on this server.');}}
    if(!['GET','HEAD'].includes(method))fail(405,'Method not allowed.');const pathname=decodeURIComponent(path);const file=resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+sep))fail(403,'Access denied.');let actual;try{actual=await realpath(file);}catch{fail(404,'Not found.');}if(!actual.startsWith(root+sep))fail(403,'Access denied.');const data=await readFile(actual);res.writeHead(200,{'Content-Type':types[extname(actual)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(method==='HEAD'?undefined:data);
   }catch(e){if(!res.headersSent)json(res,e.status||500,{error:e.status?e.message:'The server could not complete the request.'});else res.end();}
  };

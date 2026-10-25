@@ -1,0 +1,190 @@
+{
+  "name": "Aarogya Drishti - patient voice intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "drishti-voice-intake",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "intake",
+      "name": "Authenticated event intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "drishti-voice-intake",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiWebhookAuth",
+          "name": "Drishti webhook authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json.body;\nif (!event || event.type !== 'voice.requested' || !/^[0-9a-f-]{36}$/.test(event.id)) throw new Error('Invalid voice request');\nreturn [{json:{eventId:event.id}}];"
+      },
+      "id": "validate",
+      "name": "Validate voice request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/voice/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "receipt",
+      "name": "Dispatch once through private app",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        770,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiCallbackAuth",
+          "name": "Drishti app callback authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ack",
+      "name": "Acknowledge request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1030,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "poll",
+      "name": "Every minute check call results",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        260,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/voice/reconcile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 35000
+        }
+      },
+      "id": "reconcile",
+      "name": "Verify completed calls and fill intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        550,
+        600
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "drishtiCallbackAuth",
+          "name": "Drishti app callback authentication"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Authenticated event intake": {
+      "main": [
+        [
+          {
+            "node": "Validate voice request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate voice request": {
+      "main": [
+        [
+          {
+            "node": "Dispatch once through private app",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch once through private app": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every minute check call results": {
+      "main": [
+        [
+          {
+            "node": "Verify completed calls and fill intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {},
+  "id": "drishtiVoiceIntake"
+}

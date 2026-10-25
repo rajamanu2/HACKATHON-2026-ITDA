@@ -17,7 +17,7 @@ final class CareHttpClient {
  static final int CONNECT_TIMEOUT=15000;
  static String normalizeAddress(String value){String address=value.trim().replaceAll("/+$","");for(String suffix:new String[]{"/downloads/android","/api/health"})if(address.endsWith(suffix))return address.substring(0,address.length()-suffix.length());return address;}
  static boolean allowed(String path,String method,String body){
-  return path!=null&&path.matches("/api/(auth/(login|logout|me)|ai/status|health|patients|patients/AD-[A-Za-z0-9-]+/(review|care|research-ai)|automation/(sync|status)|admin/(users|users/bulk|audit)|consultations)(\\?patientId=AD-[A-Za-z0-9-]+)?")
+  return path!=null&&path.matches("/api/(auth/(login|logout|me)|ai/status|voice/(status|calls)|health|patients|patients/AD-[A-Za-z0-9-]+/(review|care|research-ai)|automation/(sync|status)|admin/(users|users/bulk|audit)|consultations)(\\?patientId=AD-[A-Za-z0-9-]+)?")
    &&("GET".equals(method)||"POST".equals(method)||"PATCH".equals(method))&&body!=null&&body.length()<=3000000;
  }
  static final class Response {

@@ -45,8 +45,10 @@ docker compose --env-file cloud/.env -f cloud/compose.yaml stop app
 docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs import:credentials --input=.local/n8n-credentials.json
 docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-events.json
 docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-consultations.json
+docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs import:workflow --input=n8n/drishti-voice-intake.json
 docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs publish:workflow --id=drishtiLocalEvents
 docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs publish:workflow --id=drishtiVideoConsultations
+docker compose --env-file cloud/.env -f cloud/compose.yaml run --rm app node scripts/local-n8n.mjs publish:workflow --id=drishtiVoiceIntake
 docker compose --env-file cloud/.env -f cloud/compose.yaml up -d app
 ```
 

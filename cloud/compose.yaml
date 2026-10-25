@@ -9,6 +9,11 @@ services:
       PORT: 4173
       COOKIE_SECURE: "true"
       DATA_DIR: /app/.local
+      VOICE_CALLING_ENABLED: ${VOICE_CALLING_ENABLED:-false}
+      VOICE_DAILY_LIMIT: ${VOICE_DAILY_LIMIT:-5}
+      BOLNA_API_KEY: ${BOLNA_API_KEY:-}
+      BOLNA_AGENT_TE: ${BOLNA_AGENT_TE:-}
+      BOLNA_AGENT_EN: ${BOLNA_AGENT_EN:-}
     volumes:
       - care-data:/app/.local
     ports:
